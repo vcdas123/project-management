@@ -7,3 +7,7 @@
 2025-04-26 18:11:38 error: Error: 401 - Invalid authentication token
 2025-04-26 18:12:34 error: Error: 401 - Invalid authentication token
 2025-04-26 18:12:50 error: Error: 401 - Invalid authentication token
+2025-04-26 18:41:57 error: Error: 403 - User not authorized to access this resource
+2025-04-26 18:45:56 error: Error: 403 - You do not have permission to access this project
+2025-04-26 19:04:47 error: Error: 403 - You do not have permission to update this task status
+2025-04-26 19:05:10 error: Error: 404 - Task not found
