@@ -106,6 +106,7 @@ export class AuthService {
     await this.userRepository.save(user);
 
     // Send email
+    console.log("resetToken", resetToken);
     const emailOptions = generatePasswordResetEmail(email, resetToken);
     return await sendEmail(emailOptions);
   }

@@ -1,23 +1,30 @@
-import { AppDataSource } from '../database/connection';
-import { Project, ProjectStatus } from '../entities/Project';
-import { User, UserRole } from '../entities/User';
-import { ProjectMember } from '../entities/ProjectMember';
-import { ProjectHistory } from '../entities/ProjectHistory';
-import { AppError } from '../utils/appError';
-import { CreateProjectDto } from '../dtos/project/create-project.dto';
-import { UpdateProjectDto } from '../dtos/project/update-project.dto';
-import { ProjectQueryDto } from '../dtos/project/project-query.dto';
-import { createPagination, PaginatedResult } from '../utils/pagination';
-import { ActionType } from '../entities/ProjectHistory';
-import { In } from 'typeorm';
+import { AppDataSource } from "../database/connection";
+import { Project, ProjectStatus } from "../entities/Project";
+import { User, UserRole } from "../entities/User";
+import { ProjectMember } from "../entities/ProjectMember";
+import { ProjectHistory } from "../entities/ProjectHistory";
+import { AppError } from "../utils/appError";
+import { CreateProjectDto } from "../dtos/project/create-project.dto";
+import { UpdateProjectDto } from "../dtos/project/update-project.dto";
+import { ProjectQueryDto } from "../dtos/project/project-query.dto";
+import { createPagination, PaginatedResult } from "../utils/pagination";
+import { ActionType } from "../entities/ProjectHistory";
+import { In } from "typeorm";
+import { Task, TaskMember, TaskStatus } from "@/entities";
 
 export class ProjectService {
   private projectRepository = AppDataSource.getRepository(Project);
   private userRepository = AppDataSource.getRepository(User);
   private projectMemberRepository = AppDataSource.getRepository(ProjectMember);
-  private projectHistoryRepository = AppDataSource.getRepository(ProjectHistory);
+  private projectHistoryRepository =
+    AppDataSource.getRepository(ProjectHistory);
+  private taskMemberRepository = AppDataSource.getRepository(TaskMember);
+  private taskRepository = AppDataSource.getRepository(Task);
 
-  async create(createProjectDto: CreateProjectDto, userId: string): Promise<Project> {
+  async create(
+    createProjectDto: CreateProjectDto,
+    userId: string
+  ): Promise<Project> {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -26,7 +33,7 @@ export class ProjectService {
       // Get user
       const user = await this.userRepository.findOneBy({ id: userId });
       if (!user) {
-        throw new AppError('User not found', 404);
+        throw new AppError("User not found", 404);
       }
 
       // Create project
@@ -42,8 +49,10 @@ export class ProjectService {
 
       // Add project members if any
       if (createProjectDto.memberIds && createProjectDto.memberIds.length > 0) {
-        const members = await this.userRepository.findBy({ id: In(createProjectDto.memberIds) });
-        
+        const members = await this.userRepository.findBy({
+          id: In(createProjectDto.memberIds),
+        });
+
         for (const member of members) {
           const projectMember = new ProjectMember();
           projectMember.project = savedProject;
@@ -67,7 +76,7 @@ export class ProjectService {
         description: savedProject.description,
         deadline: savedProject.deadline,
         status: savedProject.status,
-        images: savedProject.images
+        images: savedProject.images,
       };
 
       await queryRunner.manager.save(history);
@@ -83,54 +92,62 @@ export class ProjectService {
     }
   }
 
-  async findAll(query: ProjectQueryDto, userId: string, userRole: UserRole): Promise<PaginatedResult<Project>> {
-    const { 
-      search, 
-      status, 
-      ownerId, 
-      startDate, 
-      endDate, 
-      sortBy = 'createdAt', 
-      sortOrder = 'DESC',
-      page = 1, 
-      limit = 10 
+  async findAll(
+    query: ProjectQueryDto,
+    userId: string,
+    userRole: UserRole
+  ): Promise<PaginatedResult<Project>> {
+    const {
+      search,
+      status,
+      ownerId,
+      startDate,
+      endDate,
+      sortBy = "createdAt",
+      sortOrder = "DESC",
+      page = 1,
+      limit = 10,
     } = query;
 
-    const queryBuilder = this.projectRepository.createQueryBuilder('project')
-      .leftJoinAndSelect('project.owner', 'owner')
-      .leftJoinAndSelect('project.members', 'members')
-      .leftJoinAndSelect('members.user', 'memberUser');
+    const queryBuilder = this.projectRepository
+      .createQueryBuilder("project")
+      .leftJoinAndSelect("project.owner", "owner")
+      .leftJoinAndSelect("project.members", "members")
+      .leftJoinAndSelect("members.user", "memberUser");
 
     // Filter by user access (admin can see all, users only see their own or where they are members)
     if (userRole !== UserRole.ADMIN) {
-      queryBuilder.where('project.ownerId = :userId', { userId })
-        .orWhere('members.userId = :userId', { userId });
+      queryBuilder
+        .where("project.ownerId = :userId", { userId })
+        .orWhere("members.userId = :userId", { userId });
     }
 
     // Apply filters
     if (search) {
-      queryBuilder.andWhere('(project.name LIKE :search OR project.description LIKE :search)', 
-        { search: `%${search}%` });
+      queryBuilder.andWhere(
+        "(project.name LIKE :search OR project.description LIKE :search)",
+        { search: `%${search}%` }
+      );
     }
 
     if (status) {
-      queryBuilder.andWhere('project.status = :status', { status });
+      queryBuilder.andWhere("project.status = :status", { status });
     }
 
     if (ownerId) {
-      queryBuilder.andWhere('project.ownerId = :ownerId', { ownerId });
+      queryBuilder.andWhere("project.ownerId = :ownerId", { ownerId });
     }
 
     if (startDate) {
-      queryBuilder.andWhere('project.deadline >= :startDate', { startDate });
+      queryBuilder.andWhere("project.deadline >= :startDate", { startDate });
     }
 
     if (endDate) {
-      queryBuilder.andWhere('project.deadline <= :endDate', { endDate });
+      queryBuilder.andWhere("project.deadline <= :endDate", { endDate });
     }
 
     // Apply sorting
-    queryBuilder.orderBy(`project.${sortBy}`, sortOrder as 'ASC' | 'DESC');
+    queryBuilder.orderBy(`project.${sortBy}`, sortOrder as "ASC" | "DESC");
 
     // Apply pagination
     const skip = (page - 1) * limit;
@@ -142,27 +159,41 @@ export class ProjectService {
     return createPagination(projects, total, { page, limit });
   }
 
-  async findById(id: string, userId: string, userRole: UserRole): Promise<Project> {
+  async findById(
+    id: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<Project> {
     const project = await this.projectRepository.findOne({
       where: { id },
-      relations: ['owner', 'members', 'members.user']
+      relations: ["owner", "members", "members.user"],
     });
 
     if (!project) {
-      throw new AppError('Project not found', 404);
+      throw new AppError("Project not found", 404);
     }
 
     // Check user access
-    if (userRole !== UserRole.ADMIN && 
-        project.ownerId !== userId && 
-        !project.members.some(member => member.userId === userId)) {
-      throw new AppError('You do not have permission to access this project', 403);
+    if (
+      userRole !== UserRole.ADMIN &&
+      project.ownerId !== userId &&
+      !project.members.some(member => member.userId === userId)
+    ) {
+      throw new AppError(
+        "You do not have permission to access this project",
+        403
+      );
     }
 
     return project;
   }
 
-  async update(id: string, updateProjectDto: UpdateProjectDto, userId: string, userRole: UserRole): Promise<Project> {
+  async update(
+    id: string,
+    updateProjectDto: UpdateProjectDto,
+    userId: string,
+    userRole: UserRole
+  ): Promise<Project> {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -171,16 +202,19 @@ export class ProjectService {
       // Get project with relations
       const project = await this.projectRepository.findOne({
         where: { id },
-        relations: ['owner', 'members']
+        relations: ["owner", "members"],
       });
 
       if (!project) {
-        throw new AppError('Project not found', 404);
+        throw new AppError("Project not found", 404);
       }
 
       // Check permissions (only admin or project owner can update)
       if (userRole !== UserRole.ADMIN && project.ownerId !== userId) {
-        throw new AppError('You do not have permission to update this project', 403);
+        throw new AppError(
+          "You do not have permission to update this project (allowed to admin and project owner only)",
+          403
+        );
       }
 
       // Store original values for history
@@ -189,31 +223,93 @@ export class ProjectService {
         description: project.description,
         deadline: project.deadline,
         status: project.status,
-        images: project.images
+        images: project.images,
+        members: project.members,
       };
 
       // Update project
       if (updateProjectDto.name) project.name = updateProjectDto.name;
-      if (updateProjectDto.description) project.description = updateProjectDto.description;
-      if (updateProjectDto.deadline) project.deadline = new Date(updateProjectDto.deadline);
+      if (updateProjectDto.description)
+        project.description = updateProjectDto.description;
+      if (updateProjectDto.deadline)
+        project.deadline = new Date(updateProjectDto.deadline);
       if (updateProjectDto.status) project.status = updateProjectDto.status;
       if (updateProjectDto.images) project.images = updateProjectDto.images;
 
       // Save project
       const updatedProject = await queryRunner.manager.save(project);
 
+      // // Handle members update if provided
+      // if (updateProjectDto.memberIds) {
+      //   // Remove existing members
+      //   await queryRunner.manager.delete(ProjectMember, {
+      //     projectId: project.id,
+      //   });
+
+      //   // Add new members
+      //   const members = await this.userRepository.findBy({
+      //     id: In(updateProjectDto.memberIds),
+      //   });
+
+      //   for (const member of members) {
+      //     const projectMember = new ProjectMember();
+      //     projectMember.project = updatedProject;
+      //     projectMember.projectId = updatedProject.id;
+      //     projectMember.user = member;
+      //     projectMember.userId = member.id;
+
+      //     await queryRunner.manager.save(projectMember);
+      //   }
+      // }
+
       // Handle members update if provided
       if (updateProjectDto.memberIds) {
-        // Remove existing members
-        await queryRunner.manager.delete(ProjectMember, { projectId: project.id });
+        // Find current members
+        const currentMembers = project.members.map(member => member.userId);
+        const newMembers = updateProjectDto.memberIds;
 
-        // Add new members
-        const members = await this.userRepository.findBy({ id: In(updateProjectDto.memberIds) });
-        
+        // Check if all current members are still present
+        const removedMembers = currentMembers.filter(
+          userId => !newMembers.includes(userId)
+        );
+
+        if (removedMembers.length > 0) {
+          // Check if removed members are assigned to any INCOMPLETE tasks
+          const incompleteTasks = await this.taskRepository
+            .createQueryBuilder("task")
+            .innerJoin("task.members", "taskMember")
+            .where("task.projectId = :projectId", { projectId: project.id })
+            .andWhere("taskMember.userId IN (:...removedMembers)", {
+              removedMembers,
+            })
+            .andWhere("task.status != :completedStatus", {
+              completedStatus: TaskStatus.COMPLETED,
+            })
+            .select(["task.name"])
+            .getMany();
+
+          if (incompleteTasks.length > 0) {
+            throw new AppError(
+              `Cannot remove members who are assigned to incomplete tasks. Please delegate the tasks first to project members.`,
+              400,
+              { tasks: incompleteTasks }
+            );
+          }
+        }
+
+        // Now safe to update members
+        await queryRunner.manager.delete(ProjectMember, {
+          projectId: project.id,
+        });
+
+        const members = await this.userRepository.findBy({
+          id: In(updateProjectDto.memberIds),
+        });
+
         for (const member of members) {
           const projectMember = new ProjectMember();
-          projectMember.project = updatedProject;
-          projectMember.projectId = updatedProject.id;
+          projectMember.project = project;
+          projectMember.projectId = project.id;
           projectMember.user = member;
           projectMember.userId = member.id;
 
@@ -223,7 +319,10 @@ export class ProjectService {
 
       // Track history
       const user = await this.userRepository.findOneBy({ id: userId });
-      
+      const newProjectMembers = await this.projectMemberRepository.findOneBy({
+        projectId: project.id,
+      });
+
       const history = new ProjectHistory();
       history.project = updatedProject;
       history.projectId = updatedProject.id;
@@ -237,8 +336,9 @@ export class ProjectService {
           description: updatedProject.description,
           deadline: updatedProject.deadline,
           status: updatedProject.status,
-          images: updatedProject.images
-        }
+          images: updatedProject.images,
+          members: newProjectMembers,
+        },
       };
 
       await queryRunner.manager.save(history);
@@ -254,7 +354,12 @@ export class ProjectService {
     }
   }
 
-  async updateStatus(id: string, status: ProjectStatus, userId: string, userRole: UserRole): Promise<Project> {
+  async updateStatus(
+    id: string,
+    status: ProjectStatus,
+    userId: string,
+    userRole: UserRole
+  ): Promise<Project> {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -262,16 +367,19 @@ export class ProjectService {
     try {
       const project = await this.projectRepository.findOne({
         where: { id },
-        relations: ['owner']
+        relations: ["owner"],
       });
 
       if (!project) {
-        throw new AppError('Project not found', 404);
+        throw new AppError("Project not found", 404);
       }
 
       // Check permissions (only admin or project owner can update status)
       if (userRole !== UserRole.ADMIN && project.ownerId !== userId) {
-        throw new AppError('You do not have permission to update this project status', 403);
+        throw new AppError(
+          "You do not have permission to update this project status",
+          403
+        );
       }
 
       const originalStatus = project.status;
@@ -281,7 +389,7 @@ export class ProjectService {
 
       // Track history
       const user = await this.userRepository.findOneBy({ id: userId });
-      
+
       const history = new ProjectHistory();
       history.project = updatedProject;
       history.projectId = updatedProject.id;
@@ -289,9 +397,9 @@ export class ProjectService {
       history.userId = userId;
       history.action = ActionType.UPDATE;
       history.changes = {
-        field: 'status',
+        field: "status",
         before: originalStatus,
-        after: status
+        after: status,
       };
 
       await queryRunner.manager.save(history);
@@ -307,7 +415,11 @@ export class ProjectService {
     }
   }
 
-  async delete(id: string, userId: string, userRole: UserRole): Promise<boolean> {
+  async delete(
+    id: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<boolean> {
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -315,21 +427,21 @@ export class ProjectService {
     try {
       const project = await this.projectRepository.findOne({
         where: { id },
-        relations: ['owner']
+        relations: ["owner"],
       });
 
       if (!project) {
-        throw new AppError('Project not found', 404);
+        throw new AppError("Project not found", 404);
       }
 
       // Only admin can delete projects
       if (userRole !== UserRole.ADMIN) {
-        throw new AppError('Only admin can delete projects', 403);
+        throw new AppError("Only admin can delete projects", 403);
       }
 
       // Track history before deletion
       const user = await this.userRepository.findOneBy({ id: userId });
-      
+
       const history = new ProjectHistory();
       history.project = project;
       history.projectId = project.id;
@@ -340,7 +452,7 @@ export class ProjectService {
         name: project.name,
         description: project.description,
         status: project.status,
-        deadline: project.deadline
+        deadline: project.deadline,
       };
 
       await queryRunner.manager.save(history);
@@ -362,15 +474,19 @@ export class ProjectService {
     }
   }
 
-  async getProjectHistory(id: string, userId: string, userRole: UserRole): Promise<ProjectHistory[]> {
+  async getProjectHistory(
+    id: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<ProjectHistory[]> {
     // Check project exists and user has access
     const project = await this.findById(id, userId, userRole);
 
     // Get history
     const history = await this.projectHistoryRepository.find({
       where: { projectId: id },
-      relations: ['user'],
-      order: { createdAt: 'DESC' }
+      relations: ["user"],
+      order: { createdAt: "DESC" },
     });
 
     return history;
