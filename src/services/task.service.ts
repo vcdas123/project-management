@@ -58,6 +58,18 @@ export class TaskService {
 
       // Validate deadline against project deadline
       const taskDeadline = new Date(createTaskDto.deadline);
+      const taskStartDate = new Date(createTaskDto.startDate);
+      
+      // Validate task start date is not before project start date
+      if (taskStartDate < project.startDate) {
+        throw new AppError("Task start date cannot be before project start date", 400);
+      }
+      
+      // Validate task start date is before task deadline
+      if (taskStartDate >= taskDeadline) {
+        throw new AppError("Task start date must be before task deadline", 400);
+      }
+      
       if (taskDeadline > project.deadline) {
         throw new AppError("Task deadline cannot exceed project deadline", 400);
       }
@@ -66,6 +78,7 @@ export class TaskService {
       const task = new Task();
       task.name = createTaskDto.name;
       task.description = createTaskDto.description;
+      task.startDate = taskStartDate;
       task.deadline = taskDeadline;
       task.images = createTaskDto.images || [];
       task.project = project;
@@ -112,6 +125,7 @@ export class TaskService {
       history.changes = {
         name: savedTask.name,
         description: savedTask.description,
+        startDate: savedTask.startDate,
         deadline: savedTask.deadline,
         status: savedTask.status,
         images: savedTask.images,
@@ -280,6 +294,7 @@ export class TaskService {
       const originalValues = {
         name: task.name,
         description: task.description,
+        startDate: task.startDate,
         deadline: task.deadline,
         status: task.status,
         images: task.images,
@@ -290,17 +305,40 @@ export class TaskService {
       if (updateTaskDto.description)
         task.description = updateTaskDto.description;
 
+      // Handle date updates with validation
+      let newStartDate = task.startDate;
+      let newDeadline = task.deadline;
+      
+      if (updateTaskDto.startDate) {
+        newStartDate = new Date(updateTaskDto.startDate);
+      }
+      
       if (updateTaskDto.deadline) {
-        const newDeadline = new Date(updateTaskDto.deadline);
-        // Validate against project deadline
-        if (newDeadline > task.project.deadline) {
+        newDeadline = new Date(updateTaskDto.deadline);
+      }
+      
+      // Validate task start date is not before project start date
+      if (newStartDate < task.project.startDate) {
+        throw new AppError("Task start date cannot be before project start date", 400);
+      }
+      
+      // Validate task start date is before task deadline
+      if (newStartDate >= newDeadline) {
+        throw new AppError("Task start date must be before task deadline", 400);
+      }
+      
+      // Validate task deadline against project deadline
+      if (newDeadline > task.project.deadline) {
+        throw new AppError(
           throw new AppError(
             "Task deadline cannot exceed project deadline",
             400
           );
-        }
-        task.deadline = newDeadline;
       }
+      
+      // Apply the validated dates
+      task.startDate = newStartDate;
+      task.deadline = newDeadline;
 
       if (updateTaskDto.status) task.status = updateTaskDto.status;
       if (updateTaskDto.images) task.images = updateTaskDto.images;
@@ -362,6 +400,7 @@ export class TaskService {
         after: {
           name: updatedTask.name,
           description: updatedTask.description,
+          startDate: updatedTask.startDate,
           deadline: updatedTask.deadline,
           status: updatedTask.status,
           images: updatedTask.images,
@@ -489,6 +528,7 @@ export class TaskService {
       history.changes = {
         name: task.name,
         description: task.description,
+        startDate: task.startDate,
         status: task.status,
         deadline: task.deadline,
       };

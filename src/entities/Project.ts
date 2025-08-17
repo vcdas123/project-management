@@ -35,6 +35,9 @@ export class Project {
   @Column({ type: 'date' })
   deadline: Date;
 
+  @Column({ type: 'date' })
+  startDate: Date;
+
   @Column({
     type: 'enum',
     enum: ProjectStatus,

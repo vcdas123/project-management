@@ -33,6 +33,9 @@ export class Task {
   @Column({ type: 'date' })
   deadline: Date;
 
+  @Column({ type: 'date' })
+  startDate: Date;
+
   @Column({
     type: 'enum',
     enum: TaskStatus,

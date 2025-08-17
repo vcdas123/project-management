@@ -21,6 +21,10 @@ export class CreateTaskDto {
   @IsDateString({}, { message: "Task deadline must be a valid date" })
   deadline: string;
 
+  @IsNotEmpty({ message: "Task start date is required" })
+  @IsDateString({}, { message: "Task start date must be a valid date" })
+  startDate: string;
+
   @IsNotEmpty({ message: "Project ID is required" })
   @IsUUID("all", { message: "Project ID must be a valid UUID" })
   projectId: string;

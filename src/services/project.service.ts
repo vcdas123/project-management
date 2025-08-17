@@ -40,7 +40,14 @@ export class ProjectService {
       const project = new Project();
       project.name = createProjectDto.name;
       project.description = createProjectDto.description;
+      project.startDate = new Date(createProjectDto.startDate);
       project.deadline = new Date(createProjectDto.deadline);
+
+      // Validate start date is before deadline
+      if (project.startDate >= project.deadline) {
+        throw new AppError("Project start date must be before deadline", 400);
+      }
+
       project.images = createProjectDto.images || [];
       project.owner = user;
       project.ownerId = user.id;
@@ -74,6 +81,7 @@ export class ProjectService {
       history.changes = {
         name: savedProject.name,
         description: savedProject.description,
+        startDate: savedProject.startDate,
         deadline: savedProject.deadline,
         status: savedProject.status,
         images: savedProject.images,
@@ -221,6 +229,7 @@ export class ProjectService {
       const originalValues = {
         name: project.name,
         description: project.description,
+        startDate: project.startDate,
         deadline: project.deadline,
         status: project.status,
         images: project.images,
@@ -231,8 +240,62 @@ export class ProjectService {
       if (updateProjectDto.name) project.name = updateProjectDto.name;
       if (updateProjectDto.description)
         project.description = updateProjectDto.description;
-      if (updateProjectDto.deadline)
-        project.deadline = new Date(updateProjectDto.deadline);
+      
+      // Handle date updates with validation
+      let newStartDate = project.startDate;
+      let newDeadline = project.deadline;
+      
+      if (updateProjectDto.startDate) {
+        newStartDate = new Date(updateProjectDto.startDate);
+      }
+      
+      if (updateProjectDto.deadline) {
+        newDeadline = new Date(updateProjectDto.deadline);
+        
+        // Check if any tasks have deadlines beyond the new project deadline
+        const tasksWithLaterDeadlines = await this.taskRepository
+          .createQueryBuilder("task")
+          .where("task.projectId = :projectId", { projectId: project.id })
+          .andWhere("task.deadline > :newDeadline", { newDeadline })
+          .select(["task.name", "task.deadline"])
+          .getMany();
+          
+        if (tasksWithLaterDeadlines.length > 0) {
+          throw new AppError(
+            "Cannot update project deadline. Some tasks have deadlines beyond the new project deadline.",
+            400,
+            { tasks: tasksWithLaterDeadlines }
+          );
+        }
+      }
+      
+      // Validate start date is before deadline
+      if (newStartDate >= newDeadline) {
+        throw new AppError("Project start date must be before deadline", 400);
+      }
+      
+      // Check if any tasks have start dates before the new project start date
+      if (updateProjectDto.startDate) {
+        const tasksWithEarlierStartDates = await this.taskRepository
+          .createQueryBuilder("task")
+          .where("task.projectId = :projectId", { projectId: project.id })
+          .andWhere("task.startDate < :newStartDate", { newStartDate })
+          .select(["task.name", "task.startDate"])
+          .getMany();
+          
+        if (tasksWithEarlierStartDates.length > 0) {
+          throw new AppError(
+            "Cannot update project start date. Some tasks have start dates before the new project start date.",
+            400,
+            { tasks: tasksWithEarlierStartDates }
+          );
+        }
+      }
+      
+      // Apply the validated dates
+      project.startDate = newStartDate;
+      project.deadline = newDeadline;
+      
       if (updateProjectDto.status) project.status = updateProjectDto.status;
       if (updateProjectDto.images) project.images = updateProjectDto.images;
 
@@ -334,6 +397,7 @@ export class ProjectService {
         after: {
           name: updatedProject.name,
           description: updatedProject.description,
+          startDate: updatedProject.startDate,
           deadline: updatedProject.deadline,
           status: updatedProject.status,
           images: updatedProject.images,
@@ -451,6 +515,7 @@ export class ProjectService {
       history.changes = {
         name: project.name,
         description: project.description,
+        startDate: project.startDate,
         status: project.status,
         deadline: project.deadline,
       };

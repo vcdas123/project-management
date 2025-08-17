@@ -23,6 +23,10 @@ export class UpdateProjectDto {
   deadline?: string;
 
   @IsOptional()
+  @IsDateString({}, { message: "Project start date must be a valid date" })
+  startDate?: string;
+
+  @IsOptional()
   @IsEnum(ProjectStatus, { message: "Invalid project status" })
   status?: ProjectStatus;
 

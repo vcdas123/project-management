@@ -101,10 +101,17 @@ const seedDatabase = async () => {
       project.name = faker.company.name() + " " + faker.company.buzzPhrase();
       project.description = faker.lorem.paragraphs(2);
 
-      // Set deadline between now and 3 months in future
+      // Set start date between now and 1 month in future
+      const startDate = new Date();
+      startDate.setDate(
+        startDate.getDate() + faker.number.int({ min: 1, max: 30 })
+      );
+      project.startDate = startDate;
+
+      // Set deadline between start date and 3 months after start date
       const deadline = new Date();
-      deadline.setDate(
-        deadline.getDate() + faker.number.int({ min: 30, max: 90 })
+      deadline.setTime(
+        startDate.getTime() + faker.number.int({ min: 30, max: 90 }) * 24 * 60 * 60 * 1000
       );
       project.deadline = deadline;
 

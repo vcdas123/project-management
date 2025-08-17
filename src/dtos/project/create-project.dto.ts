@@ -24,6 +24,10 @@ export class CreateProjectDto {
   @IsDateString({}, { message: "Project deadline must be a valid date" })
   deadline: string;
 
+  @IsNotEmpty({ message: "Project start date is required" })
+  @IsDateString({}, { message: "Project start date must be a valid date" })
+  startDate: string;
+
   @IsOptional()
   @IsArray({ message: "Project images must be an array" })
   images: string[];

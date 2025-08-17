@@ -23,6 +23,10 @@ export class UpdateTaskDto {
   deadline?: string;
 
   @IsOptional()
+  @IsDateString({}, { message: "Task start date must be a valid date" })
+  startDate?: string;
+
+  @IsOptional()
   @IsEnum(TaskStatus, { message: "Invalid task status" })
   status?: TaskStatus;
 
