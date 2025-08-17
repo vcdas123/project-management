@@ -334,6 +334,7 @@ export class TaskService {
             "Task deadline cannot exceed project deadline",
             400
           );
+        )
       }
       
       // Apply the validated dates
