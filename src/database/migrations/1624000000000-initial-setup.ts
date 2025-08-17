@@ -33,6 +33,7 @@ export class InitialSetup1624000000000 implements MigrationInterface {
                 id VARCHAR(36) NOT NULL,
                 name VARCHAR(255) NOT NULL,
                 description TEXT NOT NULL,
+                startDate DATE NOT NULL,
                 deadline DATE NOT NULL,
                 status ENUM('planning', 'in_progress', 'completed', 'on_hold', 'cancelled') NOT NULL DEFAULT 'planning',
                 images TEXT NULL,
@@ -41,7 +42,8 @@ export class InitialSetup1624000000000 implements MigrationInterface {
                 ownerId VARCHAR(36) NOT NULL,
                 PRIMARY KEY (id),
                 INDEX IDX_projects_ownerId (ownerId),
-                CONSTRAINT FK_projects_ownerId FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
+                CONSTRAINT FK_projects_ownerId FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT CHK_project_dates CHECK (startDate < deadline)
             ) ENGINE=InnoDB
         `);
 
@@ -51,6 +53,7 @@ export class InitialSetup1624000000000 implements MigrationInterface {
                 id VARCHAR(36) NOT NULL,
                 name VARCHAR(255) NOT NULL,
                 description TEXT NOT NULL,
+                startDate DATE NOT NULL,
                 deadline DATE NOT NULL,
                 status ENUM('pending', 'in_progress', 'completed') NOT NULL DEFAULT 'pending',
                 images TEXT NULL,
@@ -62,7 +65,8 @@ export class InitialSetup1624000000000 implements MigrationInterface {
                 INDEX IDX_tasks_projectId (projectId),
                 INDEX IDX_tasks_assignedById (assignedById),
                 CONSTRAINT FK_tasks_projectId FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE,
-                CONSTRAINT FK_tasks_assignedById FOREIGN KEY (assignedById) REFERENCES users(id) ON DELETE CASCADE
+                CONSTRAINT FK_tasks_assignedById FOREIGN KEY (assignedById) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT CHK_task_dates CHECK (startDate < deadline)
             ) ENGINE=InnoDB
         `);
 
