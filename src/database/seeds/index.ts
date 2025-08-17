@@ -325,6 +325,7 @@ const seedDatabase = async () => {
       createHistory.changes = {
         name: task.name,
         description: task.description,
+        startDate: task.startDate,
         deadline: task.deadline,
         status: task.status,
       };
